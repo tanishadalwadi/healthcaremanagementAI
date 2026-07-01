@@ -1,1 +1,1 @@
-export ./backend/src/controllers/index.ts;
+export {};

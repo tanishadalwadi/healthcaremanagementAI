@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  NURSE
+  DOCTOR
+}
+
+enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum PatientStatus {
+  ACTIVE
+  DISCHARGED
+  WAITING
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum WorkflowStepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum EventType {
+  PATIENT_ADMITTED
+  LAB_COMPLETED
+  MRI_COMPLETED
+  NEW_DOCTOR_ORDER
+  MEDICATION_ADMINISTERED
+  INSURANCE_DELAY
+  DISCHARGE_READY
+  SHIFT_STARTED
+  SHIFT_ENDED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String   @unique
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  assignedPatientsAsNurse  Patient[] @relation("AssignedNurse")
+  assignedPatientsAsDoctor Patient[] @relation("AssignedDoctor")
+  tasks                    Task[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model Department {
+  id        String           @id @default(uuid()) @db.Uuid
+  name      String           @unique
+  status    DepartmentStatus @default(ACTIVE)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  patients Patient[]
+
+  @@index([status])
+  @@map("departments")
+}
+
+model Patient {
+  id               String        @id @default(uuid()) @db.Uuid
+  patientNumber    String        @unique @map("patient_number")
+  firstName        String        @map("first_name")
+  lastName         String        @map("last_name")
+  age              Int
+  gender           Gender
+  room             String?
+  status           PatientStatus @default(ACTIVE)
+  priority         Priority      @default(MEDIUM)
+  departmentId     String        @map("department_id") @db.Uuid
+  assignedNurseId  String?       @map("assigned_nurse_id") @db.Uuid
+  assignedDoctorId String?       @map("assigned_doctor_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  department     Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  assignedNurse  User?          @relation("AssignedNurse", fields: [assignedNurseId], references: [id], onDelete: SetNull)
+  assignedDoctor User?          @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
+  workflowSteps  WorkflowStep[]
+  events         PatientEvent[]
+  tasks          Task[]
+
+  @@index([departmentId])
+  @@index([assignedNurseId])
+  @@index([assignedDoctorId])
+  @@index([status])
+  @@index([priority])
+  @@index([patientNumber])
+  @@map("patients")
+}
+
+model WorkflowStep {
+  id          String             @id @default(uuid()) @db.Uuid
+  patientId   String             @map("patient_id") @db.Uuid
+  stepName    String             @map("step_name")
+  order       Int                @map("step_order")
+  status      WorkflowStepStatus @default(PENDING)
+  startedAt   DateTime?          @map("started_at")
+  completedAt DateTime?          @map("completed_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, order])
+  @@index([patientId])
+  @@index([status])
+  @@map("workflow_steps")
+}
+
+model PatientEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  patientId   String    @map("patient_id") @db.Uuid
+  eventType   EventType @map("event_type")
+  description String
+  createdBy   String    @map("created_by")
+  timestamp   DateTime  @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@map("patient_events")
+}
+
+model Task {
+  id          String     @id @default(uuid()) @db.Uuid
+  patientId   String     @map("patient_id") @db.Uuid
+  title       String
+  description String?
+  assignedTo  String     @map("assigned_to") @db.Uuid
+  status      TaskStatus @default(TODO)
+  dueAt       DateTime?  @map("due_at")
+  completedAt DateTime?  @map("completed_at")
+
+  patient  Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  assignee User    @relation(fields: [assignedTo], references: [id], onDelete: Restrict)
+
+  @@index([patientId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([dueAt])
+  @@map("tasks")
+}
