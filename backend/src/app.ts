@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { AppError } from "./errors/app-error.js";
 import { env } from "./config/env.js";
 import { registerRoutes } from "./routes/index.js";
+import { sendError } from "./utils/api-response.js";
 import { HttpStatus, jsonResponse } from "./utils/http.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -24,12 +26,17 @@ export async function buildApp(): Promise<FastifyInstance> {
       return;
     }
 
+    if (error instanceof AppError) {
+      return sendError(reply, error.statusCode, error.message, error.error);
+    }
+
     const message =
       error instanceof Error ? error.message : "Internal server error";
 
     return jsonResponse(reply, HttpStatus.INTERNAL_SERVER_ERROR, {
-      status: "error",
+      success: false,
       message: env.IS_PRODUCTION ? "Internal server error" : message,
+      error: env.IS_PRODUCTION ? "Internal server error" : message,
     });
   });
 

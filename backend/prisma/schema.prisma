@@ -94,10 +94,12 @@ model Department {
   status    DepartmentStatus @default(ACTIVE)
   createdAt DateTime         @default(now()) @map("created_at")
   updatedAt DateTime         @updatedAt @map("updated_at")
+  deletedAt DateTime?        @map("deleted_at")
 
   patients Patient[]
 
   @@index([status])
+  @@index([deletedAt])
   @@map("departments")
 }
 
@@ -116,6 +118,7 @@ model Patient {
   assignedDoctorId String?       @map("assigned_doctor_id") @db.Uuid
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
+  deletedAt        DateTime?     @map("deleted_at")
 
   department     Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   assignedNurse  User?          @relation("AssignedNurse", fields: [assignedNurseId], references: [id], onDelete: SetNull)
@@ -130,6 +133,7 @@ model Patient {
   @@index([status])
   @@index([priority])
   @@index([patientNumber])
+  @@index([deletedAt])
   @@map("patients")
 }
 
