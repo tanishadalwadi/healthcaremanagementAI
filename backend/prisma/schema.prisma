@@ -42,10 +42,27 @@ enum Priority {
   CRITICAL
 }
 
-enum WorkflowStepStatus {
+enum WorkflowEventStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+  BLOCKED
+}
+
+enum WorkflowEventType {
+  ADMISSION
+  TRIAGE
+  LAB_ORDERED
+  LAB_COMPLETED
+  IMAGING_ORDERED
+  IMAGING_COMPLETED
+  CONSULTATION
+  TREATMENT
+  MEDICATION
+  INSURANCE_REVIEW
+  DISCHARGE_PLANNING
+  DISCHARGE_READY
+  DISCHARGE
   BLOCKED
 }
 
@@ -68,23 +85,37 @@ enum TaskStatus {
   BLOCKED
 }
 
+enum ConsultationStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  email     String   @unique
-  role      UserRole
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String
+  email        String    @unique
+  role         UserRole
+  departmentId String?   @map("department_id") @db.Uuid
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  assignedPatientsAsNurse  Patient[] @relation("AssignedNurse")
-  assignedPatientsAsDoctor Patient[] @relation("AssignedDoctor")
+  department               Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignedPatientsAsNurse  Patient[]   @relation("AssignedNurse")
+  assignedPatientsAsDoctor Patient[]   @relation("AssignedDoctor")
+  consultationsAsDoctor  Consultation[] @relation("ConsultationDoctor")
+  workflowEventsCreated  WorkflowEvent[] @relation("WorkflowEventCreator")
   tasks                    Task[]
 
   @@index([role])
+  @@index([departmentId])
+  @@index([active])
   @@map("users")
 }
 
@@ -97,6 +128,8 @@ model Department {
   deletedAt DateTime?        @map("deleted_at")
 
   patients Patient[]
+  users    User[]
+  consultations Consultation[]
 
   @@index([status])
   @@index([deletedAt])
@@ -123,9 +156,10 @@ model Patient {
   department     Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   assignedNurse  User?          @relation("AssignedNurse", fields: [assignedNurseId], references: [id], onDelete: SetNull)
   assignedDoctor User?          @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
-  workflowSteps  WorkflowStep[]
+  workflowEvents WorkflowEvent[]
   events         PatientEvent[]
   tasks          Task[]
+  consultations  Consultation[]
 
   @@index([departmentId])
   @@index([assignedNurseId])
@@ -137,21 +171,30 @@ model Patient {
   @@map("patients")
 }
 
-model WorkflowStep {
-  id          String             @id @default(uuid()) @db.Uuid
-  patientId   String             @map("patient_id") @db.Uuid
-  stepName    String             @map("step_name")
-  order       Int                @map("step_order")
-  status      WorkflowStepStatus @default(PENDING)
-  startedAt   DateTime?          @map("started_at")
-  completedAt DateTime?          @map("completed_at")
+model WorkflowEvent {
+  id          String              @id @default(uuid()) @db.Uuid
+  patientId   String              @map("patient_id") @db.Uuid
+  title       String
+  description String?
+  eventType   WorkflowEventType   @map("event_type")
+  status      WorkflowEventStatus @default(PENDING)
+  sequence    Int
+  createdBy   String?             @map("created_by") @db.Uuid
+  occurredAt  DateTime            @default(now()) @map("occurred_at")
+  startedAt   DateTime?           @map("started_at")
+  completedAt DateTime?           @map("completed_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  creator User?   @relation("WorkflowEventCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
-  @@unique([patientId, order])
+  @@unique([patientId, sequence])
   @@index([patientId])
   @@index([status])
-  @@map("workflow_steps")
+  @@index([eventType])
+  @@index([occurredAt])
+  @@map("workflow_events")
 }
 
 model PatientEvent {
@@ -188,4 +231,30 @@ model Task {
   @@index([status])
   @@index([dueAt])
   @@map("tasks")
+}
+
+model Consultation {
+  id           String             @id @default(uuid()) @db.Uuid
+  patientId    String             @map("patient_id") @db.Uuid
+  doctorId     String             @map("doctor_id") @db.Uuid
+  departmentId String             @map("department_id") @db.Uuid
+  reason       String
+  notes        String?
+  status       ConsultationStatus @default(SCHEDULED)
+  scheduledAt  DateTime?          @map("scheduled_at")
+  startedAt    DateTime?          @map("started_at")
+  completedAt  DateTime?          @map("completed_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  patient    Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor     User       @relation("ConsultationDoctor", fields: [doctorId], references: [id], onDelete: Restrict)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("consultations")
 }

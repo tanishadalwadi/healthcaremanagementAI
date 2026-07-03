@@ -42,13 +42,16 @@ const patientDetailInclude = {
       role: true,
     },
   },
-  workflowSteps: {
-    orderBy: { order: "asc" as const },
+  workflowEvents: {
+    orderBy: { sequence: "asc" as const },
     select: {
       id: true,
-      stepName: true,
-      order: true,
+      title: true,
+      description: true,
+      eventType: true,
+      sequence: true,
       status: true,
+      occurredAt: true,
       startedAt: true,
       completedAt: true,
     },

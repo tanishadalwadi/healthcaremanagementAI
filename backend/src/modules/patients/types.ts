@@ -65,11 +65,14 @@ export interface UserSummaryDto {
   role: string;
 }
 
-export interface WorkflowStepDto {
+export interface WorkflowEventDto {
   id: string;
-  stepName: string;
-  order: number;
+  title: string;
+  description: string | null;
+  eventType: string;
+  sequence: number;
   status: string;
+  occurredAt: Date;
   startedAt: Date | null;
   completedAt: Date | null;
 }
@@ -96,7 +99,7 @@ export interface PatientDetailDto extends PatientSummaryDto {
   department: DepartmentDto;
   assignedNurse: UserSummaryDto | null;
   assignedDoctor: UserSummaryDto | null;
-  workflowSteps: WorkflowStepDto[];
+  workflowEvents: WorkflowEventDto[];
   tasks: TaskDto[];
   events: PatientEventDto[];
 }

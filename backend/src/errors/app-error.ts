@@ -22,3 +22,10 @@ export class BadRequestError extends AppError {
     this.name = "BadRequestError";
   }
 }
+
+export class ConflictError extends AppError {
+  constructor(message: string, error?: unknown) {
+    super(409, message, error);
+    this.name = "ConflictError";
+  }
+}

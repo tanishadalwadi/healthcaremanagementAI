@@ -52,13 +52,16 @@ function toPatientDetailDto(patient: PatientDetailRecord): PatientDetailDto {
           role: patient.assignedDoctor.role,
         }
       : null,
-    workflowSteps: patient.workflowSteps.map((step) => ({
-      id: step.id,
-      stepName: step.stepName,
-      order: step.order,
-      status: step.status,
-      startedAt: step.startedAt,
-      completedAt: step.completedAt,
+    workflowEvents: patient.workflowEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      eventType: event.eventType,
+      sequence: event.sequence,
+      status: event.status,
+      occurredAt: event.occurredAt,
+      startedAt: event.startedAt,
+      completedAt: event.completedAt,
     })),
     tasks: patient.tasks.map((task) => ({
       id: task.id,
