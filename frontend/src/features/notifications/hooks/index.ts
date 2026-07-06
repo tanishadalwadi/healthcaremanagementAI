@@ -1,1 +1,1 @@
-export ./frontend/src/features/notifications/hooks/index.ts;
+// legacy Vite stub — superseded by App Router structure

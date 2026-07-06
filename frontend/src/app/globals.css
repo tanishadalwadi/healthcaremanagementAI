@@ -1,0 +1,109 @@
+/* ─── Google Fonts ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap');
+
+/* ─── Tabler Icons webfont — local package, avoids CDN font-path mismatch ──── */
+@import '@tabler/icons-webfont/dist/tabler-icons.min.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── shadcn/ui CSS variables (mapped to Pulse tokens) ────────────────────── */
+@layer base {
+  :root {
+    /* shadcn expects these — mapped to Pulse surface/text tokens */
+    --background: 0 0% 100%;           /* #FFFFFF (surface) */
+    --foreground: 246 23% 14%;         /* #1D1B2E (text-primary) */
+    --card: 0 0% 100%;
+    --card-foreground: 246 23% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 246 23% 14%;
+    --primary: 269 30% 52%;            /* #7C5FAE */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 300 10% 94%;          /* #EFEBEF */
+    --secondary-foreground: 246 23% 14%;
+    --muted: 300 10% 94%;
+    --muted-foreground: 270 8% 55%;    /* #8A8394 */
+    --accent: 277 53% 94%;             /* #EFE7F7 */
+    --accent-foreground: 269 30% 52%;
+    --destructive: 0 72% 51%;          /* #DC2626 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 290 17% 92%;             /* #EEE8EF – card borders */
+    --input: 290 17% 92%;
+    --ring: 269 30% 52%;               /* #7C5FAE */
+    --radius: 0.875rem;                /* 14px = card radius default */
+  }
+}
+
+/* ─── Base resets ──────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    /* Hard rule: zero box-shadow except .modal-shadow */
+    box-shadow: none !important;
+  }
+
+  body {
+    @apply bg-bg text-text-primary font-sans antialiased;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  /* Monospace only for numeric/timestamp values */
+  .font-mono,
+  [data-mono] {
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+  }
+}
+
+/* ─── Typography utilities ─────────────────────────────────────────────────── */
+@layer utilities {
+  /* Caption — always uppercase + letter-spacing, used for eyebrow labels */
+  .text-caption {
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  /* Micro — dense sub-labels, sparingly */
+  .text-micro {
+    font-size: 9px;
+    font-weight: 400;
+    line-height: 1.3;
+  }
+
+  /* ─── The ONE allowed shadow — confirmation modal only ──────────────────── */
+  .modal-shadow {
+    box-shadow: 0 24px 60px -12px rgba(29, 27, 46, 0.4) !important;
+  }
+
+  /* ─── Error state — dashed border, exclusively for errors ───────────────── */
+  .border-error {
+    border: 1.5px dashed #C9BBDF !important;
+  }
+
+  /* ─── Skeleton shimmer ───────────────────────────────────────────────────── */
+  .skeleton {
+    @apply bg-surface-alt rounded-card animate-shimmer;
+    background: linear-gradient(
+      90deg,
+      #EFEBEF 25%,
+      #F6F1F1 50%,
+      #EFEBEF 75%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* ─── Status left-border accent (blocked / critical cards only) ─────────── */
+  .card-border-blocked {
+    border-left: 3px solid #4A4458 !important;
+  }
+
+  .card-border-critical {
+    border-left: 3px solid #DC2626 !important;
+  }
+
+  .card-border-transparent {
+    border-left: 3px solid transparent !important;
+  }
+}

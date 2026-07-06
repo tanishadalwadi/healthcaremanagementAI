@@ -1,1 +1,1 @@
-export ./frontend/src/features/ai/hooks/index.ts;
+// legacy Vite stub — superseded by App Router structure

@@ -1,1 +1,1 @@
-export ./frontend/src/features/workflow/types/index.ts;
+// legacy Vite stub — superseded by App Router structure

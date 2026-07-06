@@ -46,3 +46,6 @@ frontend/.vite/
 *.local
 .cache/
 .turbo/
+
+# Next.js
+frontend/.next/

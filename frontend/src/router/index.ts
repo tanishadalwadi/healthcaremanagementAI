@@ -1,1 +1,1 @@
-export ./frontend/src/router/index.ts;
+// legacy Vite stub — superseded by App Router structure
