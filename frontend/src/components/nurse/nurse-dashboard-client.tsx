@@ -16,6 +16,7 @@ import { PatientCardCompact } from "@/components/patient/patient-card";
 import { VitalsForm } from "@/components/nurse/vitals-form";
 import { NursingTaskList } from "@/components/nurse/nursing-task-list";
 import { AiSmartPrompts } from "@/components/nurse/ai-smart-prompts";
+import { ShiftHandoffPanel } from "@/components/shared/shift-handoff-panel";
 import type { Patient, NursingTask } from "@/types";
 
 interface NurseDashboardClientProps {
@@ -115,6 +116,8 @@ export function NurseDashboardClient({
 
           {/* AI Smart Prompts */}
           <AiSmartPrompts patients={patients} tasks={tasks} />
+
+          <ShiftHandoffPanel scope="nurse" />
         </div>
       </div>
     </div>

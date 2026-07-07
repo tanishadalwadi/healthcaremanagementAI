@@ -6,5 +6,6 @@ export async function registerAuthRoutes(
   controller: AuthController,
 ): Promise<void> {
   app.post("/auth/login", controller.login);
+  app.post("/auth/register", controller.register);
   app.get("/auth/me", { preHandler: [app.authenticate] }, controller.me);
 }

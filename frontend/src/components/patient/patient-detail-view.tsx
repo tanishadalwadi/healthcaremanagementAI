@@ -23,6 +23,7 @@ import Link from "next/link";
 import { ConfirmationModal }          from "@/components/ui/confirmation-modal";
 import { cn }                         from "@/lib/utils";
 import { WorkflowTimeline }           from "@/components/patient/workflow-timeline";
+import { WorkflowReplayPlayer }       from "@/components/patient/workflow-replay";
 import { AISummaryCard }              from "@/components/patient/ai-summary-card";
 import { DischargeReadinessChecklist } from "@/components/patient/discharge-checklist";
 import { VitalsTab }                  from "@/components/patient/vitals-tab";
@@ -1231,11 +1232,14 @@ export function PatientDetailView({
             )}
 
             {activeTab === "journey" && (
-              <WorkflowTimeline
-                workflowGroups={patient.workflowGroups}
-                dischargeConditions={patient.dischargeConditions}
-                patientStatus={patient.status}
-              />
+              <>
+                <WorkflowReplayPlayer patientId={patient.id} />
+                <WorkflowTimeline
+                  workflowGroups={patient.workflowGroups}
+                  dischargeConditions={patient.dischargeConditions}
+                  patientStatus={patient.status}
+                />
+              </>
             )}
 
             {activeTab === "tasks" && (

@@ -28,10 +28,12 @@
  *   Input bar: bg #F6F1F1, border #E7E0E9, radius 14px, sparkles icon + input + mic + send
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { askPulse } from "@/lib/api";
 import { DoctorAiPanel } from "@/components/doctor/doctor-ai-panel";
+import { ShiftHandoffPanel } from "@/components/shared/shift-handoff-panel";
 import type { Patient, PatientStatus } from "@/types";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -97,6 +99,24 @@ export function MorningRoundsClient({
   const [showHistory, setShowHistory] = useState(false);
   const [reviewed, setReviewed]       = useState<Set<string>>(new Set());
   const [query, setQuery]             = useState("");
+  const [askAnswer, setAskAnswer]     = useState<string | null>(null);
+  const [askLoading, setAskLoading]   = useState(false);
+
+  const handleAsk = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || askLoading) return;
+    setAskLoading(true);
+    setAskAnswer(null);
+    try {
+      const answer = await askPulse(trimmed, "doctor");
+      setAskAnswer(answer);
+      setQuery("");
+    } catch {
+      setAskAnswer("Could not reach Pulse right now. Please try again.");
+    } finally {
+      setAskLoading(false);
+    }
+  }, [askLoading]);
 
   const historyGroups = useMemo(() => groupByPeriod(history), [history]);
   const reviewedCount = reviewed.size;
@@ -523,7 +543,8 @@ export function MorningRoundsClient({
             <button
               key={chip}
               type="button"
-              onClick={() => setQuery(chip)}
+              onClick={() => void handleAsk(chip)}
+              disabled={askLoading}
               style={{
                 fontSize: 11,
                 fontWeight: 600,
@@ -540,6 +561,43 @@ export function MorningRoundsClient({
             </button>
           ))}
         </div>
+
+        {askAnswer && (
+          <div
+            style={{
+              marginBottom: 11,
+              background: "#F8F5FD",
+              border: "1px solid #EFE7F7",
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#4A4458",
+              lineHeight: 1.55,
+              whiteSpace: "pre-line",
+            }}
+          >
+            <span
+              className="ti ti-sparkles"
+              style={{ fontSize: 13, color: "#7C5FAE", marginRight: 6 }}
+              aria-hidden="true"
+            />
+            {askAnswer}
+          </div>
+        )}
+
+        {askLoading && (
+          <div
+            style={{
+              marginBottom: 11,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#8A8394",
+            }}
+          >
+            Pulse is thinking…
+          </div>
+        )}
 
         {/* Input bar */}
         <div
@@ -561,7 +619,14 @@ export function MorningRoundsClient({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleAsk(query);
+              }
+            }}
             placeholder="Ask about any patient…"
+            disabled={askLoading}
             aria-label="Ask Pulse"
             style={{
               border: "none",
@@ -600,9 +665,11 @@ export function MorningRoundsClient({
 
           <button
             type="button"
+            onClick={() => void handleAsk(query)}
+            disabled={!query.trim() || askLoading}
             aria-label="Send"
             style={{
-              background: "#7C5FAE",
+              background: query.trim() && !askLoading ? "#7C5FAE" : "#C9BBDF",
               border: "none",
               width: 34,
               height: 34,
@@ -628,6 +695,9 @@ export function MorningRoundsClient({
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {!showHistory && patients.length > 0 && (
         <DoctorAiPanel patients={patients} />
+      )}
+      {!showHistory && (
+        <ShiftHandoffPanel scope="doctor" />
       )}
       {showHistory && (
         <div

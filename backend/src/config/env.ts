@@ -49,6 +49,8 @@ export const env = {
   JWT_SECRET:
     process.env.JWT_SECRET?.trim() ||
     "pulse-dev-jwt-secret-change-in-production",
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY?.trim() || "",
+  GEMINI_MODEL: process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash",
 } as const;
 
 export type Env = typeof env;

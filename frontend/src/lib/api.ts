@@ -849,6 +849,94 @@ export async function getAiSummary(patientId: string): Promise<string> {
   return data.summary;
 }
 
+export type AiScope = "admin" | "doctor" | "nurse";
+
+export async function askPulse(
+  question: string,
+  scope: AiScope,
+  options?: { patientId?: string },
+): Promise<string> {
+  const data = await apiPost<{ answer: string }>("/ai/ask", {
+    question,
+    scope,
+    patientId: options?.patientId,
+  });
+  return data.answer;
+}
+
+export interface AiInsightItem {
+  id: string;
+  icon: string;
+  text: string;
+}
+
+export async function getAiInsights(
+  scope: "doctor" | "nurse",
+): Promise<AiInsightItem[]> {
+  const data = await apiPost<{ items: AiInsightItem[] }>("/ai/insights", {
+    scope,
+  });
+  return data.items;
+}
+
+export interface WorkflowReplayStep {
+  id: string;
+  phase: "intake" | "inpatient" | "discharge";
+  title: string;
+  status: string;
+  occurredAt: string;
+  narration: string;
+}
+
+export interface WorkflowReplay {
+  patientId: string;
+  patientName: string;
+  overview: string;
+  steps: WorkflowReplayStep[];
+}
+
+export async function getWorkflowReplay(patientId: string): Promise<WorkflowReplay> {
+  return apiGet<WorkflowReplay>(`/patients/${patientId}/ai-workflow-replay`);
+}
+
+export interface HandoffHighlight {
+  patientId: string;
+  name: string;
+  room: string;
+  note: string;
+}
+
+export interface ShiftHandoff {
+  summary: string;
+  highlights: HandoffHighlight[];
+}
+
+export async function getShiftHandoff(
+  scope: "doctor" | "nurse",
+): Promise<ShiftHandoff> {
+  return apiPost<ShiftHandoff>("/ai/handoff", { scope });
+}
+
+export type BottleneckRisk = "high" | "medium" | "low";
+
+export interface BottleneckPrediction {
+  id: string;
+  department: string;
+  risk: BottleneckRisk;
+  title: string;
+  description: string;
+  affectedPatients: string[];
+}
+
+export interface PredictiveBottlenecks {
+  forecast: string;
+  predictions: BottleneckPrediction[];
+}
+
+export async function getPredictiveBottlenecks(): Promise<PredictiveBottlenecks> {
+  return apiGet<PredictiveBottlenecks>("/ai/predict-bottlenecks");
+}
+
 // ─── Bed assignment ───────────────────────────────────────────────────────────
 
 export async function assignBed(patientId: string, bedId: string): Promise<void> {

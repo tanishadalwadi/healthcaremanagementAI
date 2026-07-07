@@ -33,6 +33,7 @@ import { AdminPatientTable }  from "@/components/admin/admin-patient-table";
 import { AdminCalendar }      from "@/components/admin/admin-calendar";
 import { CreatePatientModal } from "@/components/admin/create-patient-modal";
 import { AdminAskPulse }     from "@/components/admin/admin-ask-pulse";
+import { PredictiveBottlenecksPanel } from "@/components/admin/predictive-bottlenecks";
 import type { Patient } from "@/types";
 
 // ─── localStorage key for "new since last viewed" discharge badge ─────────────
@@ -230,6 +231,8 @@ export default function AdminDashboardPage() {
             ))}
           </div>
         )}
+
+        <PredictiveBottlenecksPanel />
 
         {/* ── 3. Table + Calendar ───────────────────────────────────────────── */}
         <div

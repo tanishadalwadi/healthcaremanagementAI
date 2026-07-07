@@ -4,22 +4,44 @@ import { AppError } from "../../errors/app-error.js";
 import { sendError, sendSuccess } from "../../utils/api-response.js";
 import { HttpStatus } from "../../utils/http.js";
 import type { AuthService } from "./service.js";
-import { loginBodySchema } from "./validator.js";
+import { loginBodySchema, registerBodySchema } from "./validator.js";
 
 export class AuthController {
   constructor(private readonly service: AuthService) {}
+
+  private signToken = async (
+    reply: FastifyReply,
+    user: Awaited<ReturnType<AuthService["login"]>>,
+  ) => {
+    return reply.jwtSign({
+      sub: user.id,
+      email: user.email,
+      role: user.role.toUpperCase() as "ADMIN" | "NURSE" | "DOCTOR",
+    });
+  };
 
   login = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = loginBodySchema.parse(request.body);
       const user = await this.service.login(body);
-      const token = await reply.jwtSign({
-        sub: user.id,
-        email: user.email,
-        role: user.role.toUpperCase() as "ADMIN" | "NURSE" | "DOCTOR",
-      });
+      const token = await this.signToken(reply, user);
 
       return sendSuccess(reply, HttpStatus.OK, "Login successful", {
+        token,
+        user,
+      });
+    } catch (error) {
+      return this.handleError(reply, error);
+    }
+  };
+
+  register = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const body = registerBodySchema.parse(request.body);
+      const user = await this.service.register(body);
+      const token = await this.signToken(reply, user);
+
+      return sendSuccess(reply, HttpStatus.CREATED, "Account created successfully", {
         token,
         user,
       });

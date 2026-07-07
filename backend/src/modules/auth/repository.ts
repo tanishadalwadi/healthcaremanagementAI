@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, UserRole } from "@prisma/client";
 import { verifyPassword } from "../../utils/password.js";
 
 const LOGIN_ALIASES: Record<string, string> = {
@@ -65,6 +65,31 @@ export class AuthRepository {
     return this.db.user.update({
       where: { id: userId },
       data: { passwordHash },
+    });
+  }
+
+  async createUser(input: {
+    name: string;
+    email: string;
+    passwordHash: string;
+    role: UserRole;
+  }): Promise<AuthUserRecord> {
+    return this.db.user.create({
+      data: {
+        name: input.name,
+        email: input.email.toLowerCase(),
+        passwordHash: input.passwordHash,
+        role: input.role,
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        passwordHash: true,
+        active: true,
+      },
     });
   }
 

@@ -1,5 +1,5 @@
 /**
- * auth.tsx — JWT session via backend /auth/login + /auth/me.
+ * auth.tsx — JWT session via backend /auth/login + /auth/register + /auth/me.
  */
 
 "use client";
@@ -15,6 +15,7 @@ import {
 import {
   apiLogin,
   apiMe,
+  apiRegister,
   getAuthToken,
   setAuthToken,
 } from "@/lib/api-client";
@@ -30,42 +31,13 @@ export interface AuthUser {
   doctorId?: string;
 }
 
-/** Shown on login page — aliases map to real backend users in auth service. */
-export const DEMO_ACCOUNTS: Array<
-  AuthUser & { password: string; homeRoute: string; subtitle: string }
-> = [
-  {
-    id: "demo-nurse",
-    name: "Amanda Brooks",
-    role: "nurse",
-    email: "nurse@pulse.health",
-    password: "nurse123",
-    nurseId: "demo",
-    homeRoute: "/nurse",
-    subtitle: "Charge nurse · Day shift",
-  },
-  {
-    id: "demo-doctor",
-    name: "Dr. Anna Rivera",
-    role: "doctor",
-    email: "doctor@pulse.health",
-    password: "doctor123",
-    doctorId: "demo",
-    homeRoute: "/doctor",
-    subtitle: "Attending · Cardiology",
-  },
-  {
-    id: "demo-admin",
-    name: "Alex Morgan",
-    role: "admin",
-    email: "admin@pulse.health",
-    password: "admin123",
-    homeRoute: "/admin",
-    subtitle: "Hospital Administrator",
-  },
-];
-
 const SESSION_KEY = "pulse_session";
+
+const HOME_ROUTES: Record<UserRole, string> = {
+  nurse: "/nurse",
+  doctor: "/doctor",
+  admin: "/admin",
+};
 
 function toAuthUser(user: {
   id: string;
@@ -85,7 +57,17 @@ function toAuthUser(user: {
 
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<string | null>;
+  login: (
+    email: string,
+    password: string,
+    role: UserRole,
+  ) => Promise<string | null>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    role: UserRole,
+  ) => Promise<string | null>;
   logout: () => void;
   loading: boolean;
 }
@@ -121,9 +103,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string): Promise<string | null> => {
+    async (
+      email: string,
+      password: string,
+      role: UserRole,
+    ): Promise<string | null> => {
       try {
-        const { user: profile } = await apiLogin(email.trim(), password);
+        const { user: profile } = await apiLogin(email.trim(), password, role);
         const sessionUser = toAuthUser(profile);
         localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
         setUser(sessionUser);
@@ -137,6 +123,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const register = useCallback(
+    async (
+      name: string,
+      email: string,
+      password: string,
+      role: UserRole,
+    ): Promise<string | null> => {
+      try {
+        const { user: profile } = await apiRegister(
+          name.trim(),
+          email.trim(),
+          password,
+          role,
+        );
+        const sessionUser = toAuthUser(profile);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+        setUser(sessionUser);
+        return null;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not create account.";
+        return message;
+      }
+    },
+    [],
+  );
+
   const logout = useCallback(() => {
     setAuthToken(null);
     localStorage.removeItem(SESSION_KEY);
@@ -144,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -157,6 +170,5 @@ export function useAuth(): AuthContextValue {
 }
 
 export function homeRouteForRole(role: UserRole): string {
-  const account = DEMO_ACCOUNTS.find((a) => a.role === role);
-  return account?.homeRoute ?? "/login";
+  return HOME_ROUTES[role] ?? "/login";
 }

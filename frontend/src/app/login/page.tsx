@@ -1,30 +1,43 @@
-/**
- * Login page — /login
- *
- * Shows 3 demo credentials so anyone testing the app doesn't have
- * to memorize anything. On submit, validates against DEMO_ACCOUNTS,
- * calls auth.login(), then redirects to that role's home route.
- *
- * Visual spec: Pulse design system only — #F6F1F1 bg, #7C5FAE primary,
- * existing radius/typography tokens. No new hex values.
- */
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, DEMO_ACCOUNTS, homeRouteForRole } from "@/lib/auth";
+import { useAuth, homeRouteForRole, type UserRole } from "@/lib/auth";
+
+type AuthMode = "login" | "signup";
+
+const ROLES: Array<{ id: UserRole; label: string; icon: string }> = [
+  { id: "nurse", label: "Nurse", icon: "ti-nurse" },
+  { id: "doctor", label: "Doctor", icon: "ti-stethoscope" },
+  { id: "admin", label: "Admin", icon: "ti-shield-check" },
+];
+
+const inputStyle = (hasError: boolean): React.CSSProperties => ({
+  width: "100%",
+  boxSizing: "border-box",
+  background: "#F6F1F1",
+  border: `1.5px solid ${hasError ? "#DC2626" : "#E7E0E9"}`,
+  borderRadius: 12,
+  padding: "11px 14px",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  color: "#1D1B2E",
+  outline: "none",
+});
 
 export default function LoginPage() {
-  const { user, loading, login } = useAuth();
+  const { user, loading, login, register } = useAuth();
   const router = useRouter();
 
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [role, setRole] = useState<UserRole>("nurse");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // If already logged in, redirect to home
   useEffect(() => {
     if (!loading && user) {
       router.replace(homeRouteForRole(user.role));
@@ -36,21 +49,18 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
 
-    // Tiny artificial delay so the loading state is visible
-    await new Promise((r) => setTimeout(r, 400));
+    const err =
+      mode === "login"
+        ? await login(email, password, role)
+        : await register(name, email, password, role);
 
-    const err = await login(email.trim(), password);
     if (err) {
       setError(err);
       setSubmitting(false);
       return;
     }
 
-    // login() sets the user in context; read the target role from DEMO_ACCOUNTS
-    const account = DEMO_ACCOUNTS.find(
-      (a) => a.email.toLowerCase() === email.trim().toLowerCase()
-    );
-    router.push(account?.homeRoute ?? "/nurse");
+    router.push(homeRouteForRole(role));
   }
 
   if (loading) return null;
@@ -67,7 +77,6 @@ export default function LoginPage() {
       }}
     >
       <div style={{ width: 420, maxWidth: "100%" }}>
-        {/* Card */}
         <div
           style={{
             background: "#ffffff",
@@ -76,7 +85,6 @@ export default function LoginPage() {
             boxShadow: "0 24px 60px -12px rgba(29,27,46,0.4)",
           }}
         >
-          {/* Logo + wordmark */}
           <div className="flex items-center" style={{ gap: 11, marginBottom: 6 }}>
             <span
               className="flex items-center justify-center shrink-0"
@@ -93,106 +101,169 @@ export default function LoginPage() {
               <span className="ti ti-activity-heartbeat" />
             </span>
             <span
-              style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: "#1D1B2E" }}
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                color: "#1D1B2E",
+              }}
             >
               Pulse
             </span>
           </div>
 
-          <p style={{ fontSize: 13, fontWeight: 500, color: "#6B6474", margin: "4px 0 26px" }}>
-            Hospital workflow coordination
+          <p style={{ fontSize: 13, fontWeight: 500, color: "#6B6474", margin: "4px 0 22px" }}>
+            Sign in to your hospital workspace
           </p>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* Email */}
-            <div style={{ position: "relative" }}>
-              <span
-                className="ti ti-mail"
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  left: 13,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  fontSize: 16,
-                  color: "#8A8394",
-                  pointerEvents: "none",
+          {/* Login / Sign up toggle */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 6,
+              background: "#F6F1F1",
+              borderRadius: 12,
+              padding: 4,
+              marginBottom: 16,
+            }}
+          >
+            {(["login", "signup"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  setMode(item);
+                  setError(null);
                 }}
-              />
-              <input
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                required
-                autoComplete="email"
                 style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  background: "#F6F1F1",
-                  border: `1.5px solid ${error ? "#DC2626" : "#E7E0E9"}`,
-                  borderRadius: 12,
-                  padding: "11px 14px 11px 38px",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  border: "none",
+                  borderRadius: 9,
+                  padding: "9px 0",
+                  fontSize: 12,
+                  fontWeight: 600,
                   fontFamily: "inherit",
-                  color: "#1D1B2E",
-                  outline: "none",
+                  cursor: "pointer",
+                  background: mode === item ? "#fff" : "transparent",
+                  color: mode === item ? "#7C5FAE" : "#8A8394",
+                  boxShadow: mode === item ? "0 1px 3px rgba(29,27,46,0.08)" : "none",
                 }}
-                onFocus={(e) => { if (!error) e.currentTarget.style.borderColor = "#7C5FAE"; }}
-                onBlur={(e) => { if (!error) e.currentTarget.style.borderColor = "#E7E0E9"; }}
-              />
-            </div>
+              >
+                {item === "login" ? "Sign in" : "Sign up"}
+              </button>
+            ))}
+          </div>
 
-            {/* Password */}
-            <div style={{ position: "relative" }}>
-              <span
-                className="ti ti-lock"
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  left: 13,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  fontSize: 16,
-                  color: "#8A8394",
-                  pointerEvents: "none",
-                }}
-              />
+          {/* Role selector */}
+          <div style={{ marginBottom: 16 }}>
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "#8A8394",
+                margin: "0 0 8px",
+              }}
+            >
+              I am a
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {ROLES.map((item) => {
+                const selected = role === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setRole(item.id);
+                      setError(null);
+                    }}
+                    style={{
+                      border: `1.5px solid ${selected ? "#7C5FAE" : "#E7E0E9"}`,
+                      borderRadius: 12,
+                      padding: "12px 8px",
+                      background: selected ? "#EFE7F7" : "#fff",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span
+                      className={`ti ${item.icon}`}
+                      style={{ fontSize: 18, color: selected ? "#7C5FAE" : "#8A8394" }}
+                      aria-hidden="true"
+                    />
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: selected ? "#7C5FAE" : "#6B6474",
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
+          >
+            {mode === "signup" && (
               <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(null); }}
-                required
-                autoComplete="current-password"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  background: "#F6F1F1",
-                  border: `1.5px solid ${error ? "#DC2626" : "#E7E0E9"}`,
-                  borderRadius: 12,
-                  padding: "11px 14px 11px 38px",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  fontFamily: "inherit",
-                  color: "#1D1B2E",
-                  outline: "none",
+                type="text"
+                placeholder="Full name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError(null);
                 }}
-                onFocus={(e) => { if (!error) e.currentTarget.style.borderColor = "#7C5FAE"; }}
-                onBlur={(e) => { if (!error) e.currentTarget.style.borderColor = "#E7E0E9"; }}
+                required
+                autoComplete="name"
+                style={inputStyle(Boolean(error))}
               />
-            </div>
+            )}
 
-            {/* Error message */}
+            <input
+              type="email"
+              placeholder="Email address"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(null);
+              }}
+              required
+              autoComplete="email"
+              style={inputStyle(Boolean(error))}
+            />
+
+            <input
+              type="password"
+              placeholder={mode === "signup" ? "Password (min 6 characters)" : "Password"}
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError(null);
+              }}
+              required
+              minLength={mode === "signup" ? 6 : 1}
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              style={inputStyle(Boolean(error))}
+            />
+
             {error && (
-              <p style={{ fontSize: 12, fontWeight: 500, color: "#DC2626", margin: "0" }}>
+              <p style={{ fontSize: 12, fontWeight: 500, color: "#DC2626", margin: 0 }}>
                 {error}
               </p>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={submitting}
@@ -208,7 +279,6 @@ export default function LoginPage() {
                 color: "#fff",
                 fontFamily: "inherit",
                 cursor: submitting ? "default" : "pointer",
-                transition: "background 0.15s",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -222,111 +292,31 @@ export default function LoginPage() {
                   style={{ fontSize: 16, animation: "spin 0.7s linear infinite" }}
                 />
               )}
-              {submitting ? "Signing in…" : "Sign in"}
+              {submitting
+                ? mode === "login"
+                  ? "Signing in…"
+                  : "Creating account…"
+                : mode === "login"
+                  ? "Sign in"
+                  : "Create account"}
             </button>
           </form>
         </div>
 
-        {/* Demo credentials — shown below the card, visually separated */}
-        <div
+        <p
           style={{
-            marginTop: 20,
-            background: "#ffffff",
-            borderRadius: 14,
-            padding: "18px 20px",
+            fontSize: 11,
+            fontWeight: 500,
+            color: "#8A8394",
+            textAlign: "center",
+            marginTop: 16,
+            marginBottom: 0,
+            lineHeight: 1.5,
           }}
         >
-          <p
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "#8A8394",
-              margin: "0 0 12px",
-            }}
-          >
-            Demo accounts
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {DEMO_ACCOUNTS.map((account) => (
-              <button
-                key={account.email}
-                type="button"
-                onClick={() => {
-                  setEmail(account.email);
-                  setPassword(account.password);
-                  setError(null);
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid #E7E0E9",
-                  background: "#F6F1F1",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontFamily: "inherit",
-                  transition: "border-color 0.12s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#C9BBDF")}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#E7E0E9")}
-                title={`Fill in ${account.email} / ${account.password}`}
-              >
-                {/* Role chip */}
-                <span
-                  className="flex items-center justify-center shrink-0 font-bold"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 9,
-                    background: "#EFE7F7",
-                    color: "#7C5FAE",
-                    fontSize: 12,
-                    fontFamily: "inherit",
-                  }}
-                >
-                  {account.name
-                    .split(" ")
-                    .map((w) => w[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1D1B2E" }}>
-                    {account.name}
-                    <span
-                      style={{
-                        marginLeft: 6,
-                        fontSize: 10,
-                        fontWeight: 600,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        color: "#7C5FAE",
-                      }}
-                    >
-                      {account.role}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: "#8A8394", marginTop: 1 }}>
-                    {account.email} · {account.password}
-                  </div>
-                </div>
-                <span
-                  className="ti ti-arrow-right shrink-0"
-                  style={{ fontSize: 14, color: "#C9BBDF" }}
-                  aria-hidden="true"
-                />
-              </button>
-            ))}
-          </div>
-          <p style={{ fontSize: 11, fontWeight: 500, color: "#8A8394", marginTop: 12, marginBottom: 0 }}>
-            Click any account to fill in the form, then press Sign in.
-          </p>
-        </div>
+          Demo: nurse@pulse.health / nurse123 · doctor@pulse.health / doctor123 ·
+          admin@pulse.health / admin123
+        </p>
       </div>
 
       <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>

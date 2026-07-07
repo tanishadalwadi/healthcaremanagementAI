@@ -8,7 +8,7 @@ import { sendError } from "./utils/api-response.js";
 import { HttpStatus, jsonResponse } from "./utils/http.js";
 import "./types/fastify.d.js";
 
-const PUBLIC_ROUTE_PREFIXES = ["/health", "/auth/login", "/"];
+const PUBLIC_ROUTE_PREFIXES = ["/health", "/auth/login", "/auth/register", "/"];
 
 function isPublicRoute(url: string): boolean {
   const path = url.split("?")[0] ?? url;

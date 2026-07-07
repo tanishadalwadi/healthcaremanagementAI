@@ -153,8 +153,29 @@ export interface LoginResponse {
 export async function apiLogin(
   email: string,
   password: string,
+  role: "admin" | "nurse" | "doctor",
 ): Promise<LoginResponse> {
-  const data = await apiPost<LoginResponse>("/auth/login", { email, password });
+  const data = await apiPost<LoginResponse>("/auth/login", {
+    email,
+    password,
+    role,
+  });
+  setAuthToken(data.token);
+  return data;
+}
+
+export async function apiRegister(
+  name: string,
+  email: string,
+  password: string,
+  role: "admin" | "nurse" | "doctor",
+): Promise<LoginResponse> {
+  const data = await apiPost<LoginResponse>("/auth/register", {
+    name,
+    email,
+    password,
+    role,
+  });
   setAuthToken(data.token);
   return data;
 }
