@@ -1,1 +1,1 @@
-export ./backend/src/config/index.ts;
+export { env, type Env } from "./env.js";

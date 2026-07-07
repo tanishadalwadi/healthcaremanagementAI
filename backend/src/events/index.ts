@@ -1,1 +1,1 @@
-export ./backend/src/events/index.ts;
+export {};
