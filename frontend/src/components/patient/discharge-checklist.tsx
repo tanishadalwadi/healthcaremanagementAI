@@ -25,12 +25,17 @@ export interface DischargeChecklistProps {
   /** Overall patient status — used to decide whether to show Blocked badge */
   patientStatus: "ontrack" | "delayed" | "blocked" | "critical";
   className?: string;
+  /** Admin mode — show toggle buttons per condition */
+  editable?: boolean;
+  onToggle?: (condition: DischargeCondition, complete: boolean) => void;
 }
 
 export const DischargeReadinessChecklist: React.FC<DischargeChecklistProps> = ({
   conditions,
   patientStatus,
   className,
+  editable = false,
+  onToggle,
 }) => {
   const complete = conditions.filter((c) => c.status === "complete");
   const incomplete = conditions.filter((c) => c.status === "incomplete");
@@ -112,11 +117,32 @@ export const DischargeReadinessChecklist: React.FC<DischargeChecklistProps> = ({
               )}
             </div>
 
-            {/* Done timestamp */}
-            {isDone && (
-              <span className="shrink-0 text-micro text-text-muted font-mono">
-                Done
-              </span>
+            {/* Done timestamp / admin toggle */}
+            {editable && onToggle ? (
+              <button
+                type="button"
+                onClick={() => onToggle(condition, !isDone)}
+                style={{
+                  flexShrink: 0,
+                  background: isDone ? "#E1F3F0" : "#7C5FAE",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "5px 10px",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: isDone ? "#2D7A72" : "#fff",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {isDone ? "Mark incomplete" : "Mark complete"}
+              </button>
+            ) : (
+              isDone && (
+                <span className="shrink-0 text-micro text-text-muted font-mono">
+                  Done
+                </span>
+              )
             )}
           </div>
         );

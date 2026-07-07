@@ -1,16 +1,5 @@
 /**
- * auth.tsx — client-side auth context for Pulse demo.
- *
- * Three hardcoded accounts — no real backend. When a backend exists,
- * replace the DEMO_ACCOUNTS check in login() with a fetch() call.
- *
- * Session is stored in localStorage under "pulse_session". This is
- * intentionally simple — this is a portfolio demo, not a secure product.
- *
- * Demo accounts (shown on /login):
- *   nurse@pulse.health   / nurse123    → /nurse
- *   doctor@pulse.health  / doctor123   → /doctor
- *   admin@pulse.health   / admin123    → /admin
+ * auth.tsx — JWT session via backend /auth/login + /auth/me.
  */
 
 "use client";
@@ -23,8 +12,12 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import {
+  apiLogin,
+  apiMe,
+  getAuthToken,
+  setAuthToken,
+} from "@/lib/api-client";
 
 export type UserRole = "nurse" | "doctor" | "admin";
 
@@ -33,40 +26,37 @@ export interface AuthUser {
   name: string;
   role: UserRole;
   email: string;
-  /** For nurse: the nurse ID used in CareTeamAssignment */
   nurseId?: string;
-  /** For doctor: the doctor ID used in CareTeamAssignment */
   doctorId?: string;
 }
 
-// ─── Mock accounts ────────────────────────────────────────────────────────────
-
+/** Shown on login page — aliases map to real backend users in auth service. */
 export const DEMO_ACCOUNTS: Array<
   AuthUser & { password: string; homeRoute: string; subtitle: string }
 > = [
   {
-    id: "user-nurse",
-    name: "Rachel Green",
+    id: "demo-nurse",
+    name: "Amanda Brooks",
     role: "nurse",
     email: "nurse@pulse.health",
     password: "nurse123",
-    nurseId: "n1", // maps to NURSES[0] in generator — Rivera, J. (Day shift)
+    nurseId: "demo",
     homeRoute: "/nurse",
     subtitle: "Charge nurse · Day shift",
   },
   {
-    id: "user-doctor",
-    name: "Dr. Kwame Osei",
+    id: "demo-doctor",
+    name: "Dr. Anna Rivera",
     role: "doctor",
     email: "doctor@pulse.health",
     password: "doctor123",
-    doctorId: "d1", // maps to DOCTORS[0] in generator
+    doctorId: "demo",
     homeRoute: "/doctor",
     subtitle: "Attending · Cardiology",
   },
   {
-    id: "user-admin",
-    name: "Morgan Hayes",
+    id: "demo-admin",
+    name: "Alex Morgan",
     role: "admin",
     email: "admin@pulse.health",
     password: "admin123",
@@ -77,63 +67,78 @@ export const DEMO_ACCOUNTS: Array<
 
 const SESSION_KEY = "pulse_session";
 
-// ─── Context ──────────────────────────────────────────────────────────────────
+function toAuthUser(user: {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+}): AuthUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    nurseId: user.role === "nurse" ? user.id : undefined,
+    doctorId: user.role === "doctor" ? user.id : undefined,
+  };
+}
 
 interface AuthContextValue {
   user: AuthUser | null;
-  /** Returns null on success, error message string on failure */
-  login: (email: string, password: string) => string | null;
+  login: (email: string, password: string) => Promise<string | null>;
   logout: () => void;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Rehydrate from localStorage on mount
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as AuthUser;
-        setUser(parsed);
+    async function restoreSession() {
+      try {
+        const token = getAuthToken();
+        if (!token) {
+          localStorage.removeItem(SESSION_KEY);
+          return;
+        }
+
+        const profile = await apiMe();
+        const sessionUser = toAuthUser(profile);
+        setUser(sessionUser);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+      } catch {
+        setAuthToken(null);
+        localStorage.removeItem(SESSION_KEY);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      // Corrupted storage — clear it
-      localStorage.removeItem(SESSION_KEY);
-    } finally {
-      setLoading(false);
     }
+
+    void restoreSession();
   }, []);
 
   const login = useCallback(
-    (email: string, password: string): string | null => {
-      const account = DEMO_ACCOUNTS.find(
-        (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-      );
-      if (!account) return "Invalid email or password.";
-
-      const sessionUser: AuthUser = {
-        id: account.id,
-        name: account.name,
-        role: account.role,
-        email: account.email,
-        nurseId: account.nurseId,
-        doctorId: account.doctorId,
-      };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-      setUser(sessionUser);
-      return null;
+    async (email: string, password: string): Promise<string | null> => {
+      try {
+        const { user: profile } = await apiLogin(email.trim(), password);
+        const sessionUser = toAuthUser(profile);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+        setUser(sessionUser);
+        return null;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Invalid email or password.";
+        return message;
+      }
     },
-    []
+    [],
   );
 
   const logout = useCallback(() => {
+    setAuthToken(null);
     localStorage.removeItem(SESSION_KEY);
     setUser(null);
   }, []);
@@ -145,15 +150,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth() must be used inside <AuthProvider>");
   return ctx;
 }
 
-/** Home route for each role — used in redirects */
 export function homeRouteForRole(role: UserRole): string {
   const account = DEMO_ACCOUNTS.find((a) => a.role === role);
   return account?.homeRoute ?? "/login";

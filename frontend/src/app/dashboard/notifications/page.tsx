@@ -13,7 +13,11 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { getNotifications, getNotificationsForNurse } from "@/lib/api";
+import {
+  getNotifications,
+  getNotificationsForNurse,
+  markNotificationRead,
+} from "@/lib/api";
 import { NotificationList } from "@/components/notifications/notification-list";
 import type { Notification } from "@/types";
 
@@ -59,7 +63,20 @@ export default function NotificationsPage() {
           {notifications.length} total · {scopeLabel}
         </p>
       </div>
-      <NotificationList notifications={notifications} />
+      <NotificationList
+        notifications={notifications}
+        onOpen={(notification) => {
+          if (!notification.read) {
+            markNotificationRead(notification.id).then(() => {
+              setNotifications((prev) =>
+                prev.map((item) =>
+                  item.id === notification.id ? { ...item, read: true } : item,
+                ),
+              );
+            });
+          }
+        }}
+      />
     </div>
   );
 }

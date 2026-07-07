@@ -51,7 +51,8 @@ export const PatientCardCompact: React.FC<PatientCardCompactProps> = ({
   onClick,
   className,
 }) => {
-  const { name, initials, room, departmentId, dayOfStay, status } = patient;
+  const { patientNumber, name, initials, room, departmentId, dayOfStay, status } =
+    patient;
 
   return (
     <button
@@ -81,7 +82,7 @@ export const PatientCardCompact: React.FC<PatientCardCompactProps> = ({
           {name}
         </p>
         <p className="text-meta text-text-muted mt-0.5 truncate">
-          {room} · {departmentId} · {dayOfStayLabel(dayOfStay)}
+          {patientNumber} · {room} · {departmentId} · {dayOfStayLabel(dayOfStay)}
         </p>
       </div>
 

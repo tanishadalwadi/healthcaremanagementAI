@@ -39,7 +39,7 @@ export default function LoginPage() {
     // Tiny artificial delay so the loading state is visible
     await new Promise((r) => setTimeout(r, 400));
 
-    const err = login(email.trim(), password);
+    const err = await login(email.trim(), password);
     if (err) {
       setError(err);
       setSubmitting(false);

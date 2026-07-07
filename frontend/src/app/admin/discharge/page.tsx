@@ -22,7 +22,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { getDischargeQueue } from "@/lib/api";
+import { getDischargeQueue, updateDischargeCondition } from "@/lib/api";
 import { DischargeReadinessChecklist } from "@/components/patient/discharge-checklist";
 import { DischargeApprovalModal } from "@/components/admin/discharge-approval-modal";
 import type { PatientDetail } from "@/types";
@@ -62,6 +62,31 @@ export default function DischargeQueuePage() {
       }
     });
   }, [refreshKey]);
+
+  const handleConditionToggle = useCallback(
+    async (patientId: string, conditionId: string, complete: boolean) => {
+      await updateDischargeCondition(conditionId, complete);
+      setQueue((prev) =>
+        prev.map((patient) =>
+          patient.id !== patientId
+            ? patient
+            : {
+                ...patient,
+                dischargeConditions: patient.dischargeConditions.map((condition) =>
+                  condition.id === conditionId
+                    ? {
+                        ...condition,
+                        status: complete ? "complete" : "incomplete",
+                        elapsedDisplay: complete ? null : condition.elapsedDisplay,
+                      }
+                    : condition,
+                ),
+              },
+        ),
+      );
+    },
+    [],
+  );
 
   const handleFinalized = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -217,6 +242,10 @@ export default function DischargeQueuePage() {
                     <DischargeReadinessChecklist
                       conditions={patient.dischargeConditions}
                       patientStatus={patient.status}
+                      editable
+                      onToggle={(condition, complete) =>
+                        handleConditionToggle(patient.id, condition.id, complete)
+                      }
                     />
                   </div>
 

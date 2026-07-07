@@ -29,9 +29,13 @@ const DOT: Record<PatientStatus, string> = {
 
 interface NotificationListProps {
   notifications: Notification[];
+  onOpen?: (notification: Notification) => void;
 }
 
-export function NotificationList({ notifications }: NotificationListProps) {
+export function NotificationList({
+  notifications,
+  onOpen,
+}: NotificationListProps) {
   if (notifications.length === 0) {
     return (
       <div
@@ -56,6 +60,7 @@ export function NotificationList({ notifications }: NotificationListProps) {
           <Link
             key={n.id}
             href={`/patients/${n.patientId}`}
+            onClick={() => onOpen?.(n)}
             style={{
               display: "flex",
               alignItems: "flex-start",

@@ -18,7 +18,7 @@
  * Critical constraint: right sidebar NEVER changes regardless of active tab.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ConfirmationModal }          from "@/components/ui/confirmation-modal";
 import { cn }                         from "@/lib/utils";
@@ -32,6 +32,7 @@ import {
   requestDischarge,
   updateTreatmentItem,
   updateNursingTaskStatus,
+  type Consultation,
 } from "@/lib/api";
 import type {
   PatientDetail,
@@ -167,10 +168,12 @@ function OverviewTab({
   patient,
   roleView,
   allSteps,
+  consultations = [],
 }: {
   patient: PatientDetail;
   roleView: "doctor" | "nurse";
   allSteps: WorkflowStep[];
+  consultations?: Consultation[];
 }) {
   const nextAction  = getNextAction(patient);
   const blocker     = getCurrentBlocker(patient);
@@ -254,6 +257,42 @@ function OverviewTab({
         </div>
       )}
 
+      {/* Consultations */}
+      {consultations.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8394", marginBottom: 8 }}>
+            Consultations
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {consultations.map((consultation) => (
+              <div
+                key={consultation.id}
+                style={{
+                  background: "#F8F5FD",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#1D1B2E" }}>
+                  {consultation.reason}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: "#8A8394", marginTop: 3 }}>
+                  {consultation.doctorName} · {consultation.status.replace(/_/g, " ")}
+                  {consultation.scheduledAt
+                    ? ` · ${shortDate(consultation.scheduledAt)}`
+                    : ""}
+                </div>
+                {consultation.notes && (
+                  <div style={{ fontSize: 11, fontWeight: 500, color: "#6B6474", marginTop: 4, lineHeight: 1.45 }}>
+                    {consultation.notes}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Patient demographics */}
       <div>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8394", marginBottom: 8 }}>
@@ -275,10 +314,12 @@ function TasksTab({
   patient,
   roleView,
   nursingTasks,
+  onDataChange,
 }: {
   patient: PatientDetail;
   roleView: "doctor" | "nurse";
   nursingTasks: NursingTask[];
+  onDataChange?: () => void | Promise<void>;
 }) {
   // ── Local state for optimistic updates ────────────────────────────────────
   const [localPlan, setLocalPlan] = useState<TreatmentPlanItem[]>(
@@ -287,6 +328,14 @@ function TasksTab({
   const [localTasks, setLocalTasks] = useState<NursingTask[]>(nursingTasks);
   // Set of IDs currently being saved — disables buttons while in flight
   const [saving, setSaving] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLocalPlan([...patient.treatmentPlan].sort((a, b) => a.order - b.order));
+  }, [patient.treatmentPlan]);
+
+  useEffect(() => {
+    setLocalTasks(nursingTasks);
+  }, [nursingTasks]);
 
   // ── Task status display config ─────────────────────────────────────────────
   const TASK_STATUS_CFG: Record<NursingTask["status"], { bg: string; text: string; label: string }> = {
@@ -308,6 +357,7 @@ function TasksTab({
     setSaving((prev) => new Set(prev).add(itemId));
     updateTreatmentItem(patient.id, itemId, true).finally(() => {
       setSaving((prev) => { const next = new Set(prev); next.delete(itemId); return next; });
+      void onDataChange?.();
     });
   }
 
@@ -319,6 +369,7 @@ function TasksTab({
     setSaving((prev) => new Set(prev).add(taskId));
     updateNursingTaskStatus(taskId, nextStatus).finally(() => {
       setSaving((prev) => { const next = new Set(prev); next.delete(taskId); return next; });
+      void onDataChange?.();
     });
   }
 
@@ -1005,17 +1056,26 @@ export interface PatientDetailViewProps {
   defaultRole?: RoleView;
   /** Nursing tasks for the Tasks tab nurse view — fetched by the page component */
   nursingTasks?: NursingTask[];
+  consultations?: Consultation[];
+  /** Refetch patient + tasks after mutations */
+  onDataChange?: () => void | Promise<void>;
 }
 
 export function PatientDetailView({
   patient,
   defaultRole = "doctor",
   nursingTasks = [],
+  consultations = [],
+  onDataChange,
 }: PatientDetailViewProps) {
   const [roleView,  setRoleView]  = useState<RoleView>(defaultRole);
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [modalOpen, setModalOpen] = useState(false);
   const [requested, setRequested] = useState(patient.dischargeRequested || false);
+
+  useEffect(() => {
+    setRequested(patient.dischargeRequested || false);
+  }, [patient.dischargeRequested]);
 
   const allSteps      = patient.workflowGroups.flatMap((g) => g.steps);
   const pendingOrders = [...patient.treatmentPlan]
@@ -1162,7 +1222,12 @@ export function PatientDetailView({
           {/* Tab content */}
           <div style={{ padding: "24px 26px" }}>
             {activeTab === "overview" && (
-              <OverviewTab patient={patient} roleView={roleView} allSteps={allSteps} />
+              <OverviewTab
+                patient={patient}
+                roleView={roleView}
+                allSteps={allSteps}
+                consultations={consultations}
+              />
             )}
 
             {activeTab === "journey" && (
@@ -1178,6 +1243,7 @@ export function PatientDetailView({
                 patient={patient}
                 roleView={roleView}
                 nursingTasks={nursingTasks}
+                onDataChange={onDataChange}
               />
             )}
 
@@ -1358,7 +1424,9 @@ export function PatientDetailView({
         onConfirm={() => {
           setModalOpen(false);
           setRequested(true);
-          requestDischarge(patient.id, "Dr. Kwame Osei");
+          const doctorName =
+            patient.careTeam.find((m) => m.doctor)?.doctor?.name ?? "Attending physician";
+          requestDischarge(patient.id, doctorName).then(() => onDataChange?.());
         }}
       />
     </div>

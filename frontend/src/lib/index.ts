@@ -2,9 +2,10 @@
  * lib/ — utilities and data access
  *
  * Subdirectories:
- *   lib/utils.ts            — cn() helper (already written)
- *   lib/mock-data/          — Phase 1: synthetic patient generator
- *   lib/api.ts              — Phase 1: the swap-seam (getPatients, getPatientById, …)
+ *   lib/utils.ts     — cn() helper
+ *   lib/api-client.ts — HTTP client for the backend API
+ *   lib/mappers/     — backend DTO → frontend type mappers
+ *   lib/api.ts       — all data access functions
  */
 
 export { cn } from "./utils";

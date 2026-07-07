@@ -17,10 +17,12 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import {
   getPatientById,
+  getConsultationsForPatient,
   updateTreatmentItem,
   addTreatmentItem,
   addLabOrder,
   type LabPriority,
+  type Consultation,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { PatientDetail, TreatmentPlanItem } from "@/types";
@@ -96,13 +98,19 @@ export default function VisitPage() {
   const [labLog,       setLabLog]       = useState<{ name: string; priority: LabPriority }[]>([]);
   const [labNameError, setLabNameError] = useState(false);
 
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+
   const doctorName = user?.name ?? "Dr. Osei";
 
   useEffect(() => {
     if (!params.patientId) return;
-    getPatientById(params.patientId).then((p) => {
+    Promise.all([
+      getPatientById(params.patientId),
+      getConsultationsForPatient(params.patientId),
+    ]).then(([p, consults]) => {
       if (!p) { router.replace("/doctor"); return; }
       setPatient(p);
+      setConsultations(consults);
       setPlan([...p.treatmentPlan].sort((a, b) => a.order - b.order));
       // Re-derive lab log from in-memory data so it survives re-navigation.
       // occurrence === 999 is the sentinel set by addLabOrder for doctor-ordered labs.
@@ -231,6 +239,36 @@ export default function VisitPage() {
           Full record →
         </Link>
       </div>
+
+      {/* ── Consultations ─────────────────────────────────────────────────── */}
+      {consultations.length > 0 && (
+        <Panel>
+          <SectionLabel>Consultations</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {consultations.map((consultation, index) => (
+              <div
+                key={consultation.id}
+                style={{
+                  padding: "10px 0",
+                  borderTop: index === 0 ? "none" : "1px solid #F3EFF4",
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1D1B2E" }}>
+                  {consultation.reason}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: "#8A8394", marginTop: 3 }}>
+                  {consultation.doctorName} · {consultation.status.replace(/_/g, " ")}
+                </div>
+                {consultation.notes && (
+                  <div style={{ fontSize: 12, fontWeight: 500, color: "#6B6474", marginTop: 4, lineHeight: 1.45 }}>
+                    {consultation.notes}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
       {/* ── Two-column body ─────────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>

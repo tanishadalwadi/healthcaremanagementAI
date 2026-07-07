@@ -22,7 +22,8 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { Patient, PatientDetail } from "@/types";
+import { getAdminKPIs, getAiSummary, getPatientById } from "@/lib/api";
+import type { Patient } from "@/types";
 
 // ─── Suggested prompts ────────────────────────────────────────────────────────
 
@@ -34,111 +35,123 @@ const SUGGESTED_PROMPTS = [
   "Which departments have delayed patients?",
 ];
 
-// ─── Response generation — grounded from real data ────────────────────────────
+// ─── Response generation — grounded from backend AI + KPIs ───────────────────
 
-function generateResponse(
+async function fetchPatientSummaries(patients: Patient[]): Promise<string> {
+  const summaries = await Promise.all(
+    patients.slice(0, 5).map(async (patient) => {
+      try {
+        return await getAiSummary(patient.id);
+      } catch {
+        return `${patient.name} (${patient.room}, ${patient.departmentId}) — ${patient.aiSummary}`;
+      }
+    }),
+  );
+  return summaries.join("\n\n");
+}
+
+async function buildAdminResponse(
   query: string,
   allPatients: Patient[],
-  dischargeQueue: PatientDetail[]
-): string {
-  const q        = query.toLowerCase();
+  waitingPatients: Patient[],
+): Promise<string> {
+  const q = query.toLowerCase();
   const admitted = allPatients.filter((p) => !p.dischargedAt);
-  const dced     = allPatients.filter((p) => p.dischargedAt);
+  const dced = allPatients.filter((p) => p.dischargedAt);
 
-  // ── Critical patients ───────────────────────────────────────────────────────
   if (q.includes("critical")) {
     const criticals = admitted.filter((p) => p.status === "critical");
     if (criticals.length === 0) {
       return `No patients are currently in critical status. There are ${admitted.length} admitted patients across all departments.`;
     }
-    return criticals
-      .map((p) => `${p.name} (${p.room}, ${p.departmentId}) — critical. ${p.aiSummary}`)
-      .join("\n\n");
+    return fetchPatientSummaries(criticals);
   }
 
-  // ── Beds ────────────────────────────────────────────────────────────────────
   if (q.includes("bed") || q.includes("room") || q.includes("available")) {
-    const occupiedRooms = new Set(admitted.map((p) => p.room));
-    const deptBreakdown: Record<string, number> = {};
-    admitted.forEach((p) => {
-      deptBreakdown[p.departmentId] = (deptBreakdown[p.departmentId] ?? 0) + 1;
-    });
-    const breakdown = Object.entries(deptBreakdown)
-      .map(([dept, count]) => `${dept}: ${count} occupied`)
+    const kpis = await getAdminKPIs();
+    const breakdown = Object.entries(kpis.bedsByDept)
+      .map(([dept, count]) => `${dept}: ${count} available`)
       .join(", ");
-    return `Currently ${occupiedRooms.size} beds occupied across all departments (${breakdown}). ${admitted.length} patients admitted, ${dced.length} discharged this period.`;
-  }
-
-  // ── Discharge queue ─────────────────────────────────────────────────────────
-  if (q.includes("discharge") || q.includes("pending") || q.includes("queue") || q.includes("approval")) {
-    if (dischargeQueue.length === 0) {
-      return "No patients are currently pending discharge approval. The discharge queue is empty.";
-    }
     return (
-      `${dischargeQueue.length} patient${dischargeQueue.length !== 1 ? "s" : ""} pending discharge approval:\n\n` +
-      dischargeQueue.map((p) => {
-        const complete  = p.dischargeConditions.filter((c) => c.status === "complete").length;
-        const total     = p.dischargeConditions.length;
-        const canApprove = complete === total;
-        return `${p.name} (${p.room}) — ${complete}/${total} conditions complete. ${canApprove ? "Ready for final approval." : `Waiting on: ${p.dischargeConditions.filter((c) => c.status === "incomplete").map((c) => c.condition).join(", ")}.`}`;
-      }).join("\n\n")
+      `${kpis.availableBeds} beds available hospital-wide (${breakdown}). ` +
+      `${admitted.length} patients admitted, ${dced.length} discharged this period. ` +
+      `${kpis.availableAmbulances} ambulances available, ${kpis.dispatchedAmbulances} dispatched.`
     );
   }
 
-  // ── Blocked patients ────────────────────────────────────────────────────────
-  if (q.includes("block") || q.includes("issue") || q.includes("problem") || q.includes("delay")) {
-    const blocked  = admitted.filter((p) => p.status === "blocked");
-    const delayed  = admitted.filter((p) => p.status === "delayed");
-    if (blocked.length === 0 && delayed.length === 0) {
-      return `No blocked or delayed patients right now. All ${admitted.length} admitted patients are on track.`;
+  if (q.includes("discharge") || q.includes("pending") || q.includes("queue") || q.includes("approval")) {
+    if (waitingPatients.length === 0) {
+      return "No patients are currently pending discharge approval. The discharge queue is empty.";
     }
-    const parts: string[] = [];
-    if (blocked.length > 0) {
-      parts.push(
-        `Blocked (${blocked.length}): ` +
-        blocked.map((p) => `${p.name} (${p.room}) — ${p.aiSummary}`).join("; ")
-      );
-    }
-    if (delayed.length > 0) {
-      parts.push(
-        `Delayed (${delayed.length}): ` +
-        delayed.map((p) => `${p.name} (${p.room}) — ${p.aiSummary}`).join("; ")
-      );
-    }
-    return parts.join("\n\n");
+    const details = await Promise.all(
+      waitingPatients.slice(0, 5).map((patient) => getPatientById(patient.id)),
+    );
+    const summaries = await Promise.all(
+      details
+        .filter((patient): patient is NonNullable<typeof patient> => patient !== null)
+        .map(async (patient) => {
+          const complete = patient.dischargeConditions.filter(
+            (condition) => condition.status === "complete",
+          ).length;
+          const total = patient.dischargeConditions.length;
+          let summary = patient.aiSummary;
+          try {
+            summary = await getAiSummary(patient.id);
+          } catch {
+            // keep cached summary
+          }
+          return `${patient.name} (${patient.room}) — ${complete}/${total} conditions complete.\n${summary}`;
+        }),
+    );
+    return (
+      `${waitingPatients.length} patient${waitingPatients.length !== 1 ? "s" : ""} pending discharge approval:\n\n` +
+      summaries.join("\n\n")
+    );
   }
 
-  // ── Department breakdown ────────────────────────────────────────────────────
+  if (q.includes("block") || q.includes("issue") || q.includes("problem") || q.includes("delay")) {
+    const flagged = admitted.filter(
+      (p) => p.status === "blocked" || p.status === "delayed",
+    );
+    if (flagged.length === 0) {
+      return `No blocked or delayed patients right now. All ${admitted.length} admitted patients are on track.`;
+    }
+    return fetchPatientSummaries(flagged);
+  }
+
   if (q.includes("department") || q.includes("dept") || q.includes("unit")) {
     const deptMap: Record<string, { total: number; critical: number; blocked: number; delayed: number }> = {};
     admitted.forEach((p) => {
-      if (!deptMap[p.departmentId]) deptMap[p.departmentId] = { total: 0, critical: 0, blocked: 0, delayed: 0 };
+      if (!deptMap[p.departmentId]) {
+        deptMap[p.departmentId] = { total: 0, critical: 0, blocked: 0, delayed: 0 };
+      }
       deptMap[p.departmentId].total++;
       if (p.status === "critical") deptMap[p.departmentId].critical++;
-      if (p.status === "blocked")  deptMap[p.departmentId].blocked++;
-      if (p.status === "delayed")  deptMap[p.departmentId].delayed++;
+      if (p.status === "blocked") deptMap[p.departmentId].blocked++;
+      if (p.status === "delayed") deptMap[p.departmentId].delayed++;
     });
     return Object.entries(deptMap)
       .map(([dept, stats]) => {
         const flags: string[] = [];
         if (stats.critical > 0) flags.push(`${stats.critical} critical`);
-        if (stats.blocked  > 0) flags.push(`${stats.blocked} blocked`);
-        if (stats.delayed  > 0) flags.push(`${stats.delayed} delayed`);
+        if (stats.blocked > 0) flags.push(`${stats.blocked} blocked`);
+        if (stats.delayed > 0) flags.push(`${stats.delayed} delayed`);
         return `${dept}: ${stats.total} patients${flags.length ? ` (${flags.join(", ")})` : " — all on track"}`;
       })
       .join("\n");
   }
 
-  // ── Fallback — hospital summary ─────────────────────────────────────────────
+  const kpis = await getAdminKPIs();
   const critical = admitted.filter((p) => p.status === "critical").length;
-  const blocked  = admitted.filter((p) => p.status === "blocked").length;
-  const delayed  = admitted.filter((p) => p.status === "delayed").length;
-  const ontrack  = admitted.filter((p) => p.status === "ontrack").length;
+  const blocked = admitted.filter((p) => p.status === "blocked").length;
+  const delayed = admitted.filter((p) => p.status === "delayed").length;
+  const ontrack = admitted.filter((p) => p.status === "ontrack").length;
 
   return (
     `Hospital summary: ${admitted.length} admitted, ${dced.length} discharged.\n\n` +
     `Status breakdown: ${ontrack} on track, ${delayed} delayed, ${blocked} blocked, ${critical} critical.\n\n` +
-    `Discharge queue: ${dischargeQueue.length} patient${dischargeQueue.length !== 1 ? "s" : ""} pending admin approval.`
+    `Capacity: ${kpis.availableBeds} beds available, ${kpis.availableAmbulances} ambulances available.\n\n` +
+    `Discharge queue: ${kpis.dischargeQueueCount} patient${kpis.dischargeQueueCount !== 1 ? "s" : ""} pending admin approval.`
   );
 }
 
@@ -153,31 +166,41 @@ interface Message {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface AdminAskPulseProps {
-  allPatients:    Patient[];
-  dischargeQueue: PatientDetail[];
+  allPatients:     Patient[];
+  waitingPatients: Patient[];
 }
 
-export function AdminAskPulse({ allPatients, dischargeQueue }: AdminAskPulseProps) {
+export function AdminAskPulse({ allPatients, waitingPatients }: AdminAskPulseProps) {
   const [open,     setOpen]     = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input,    setInput]    = useState("");
+  const [thinking, setThinking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, open]);
+  }, [messages, open, thinking]);
 
-  const send = useCallback((text: string) => {
-    if (!text.trim()) return;
-    const userMsg: Message = { id: String(Date.now()),    role: "user", text: text.trim() };
-    const aiMsg:   Message = { id: String(Date.now() + 1), role: "ai",
-      text: generateResponse(text, allPatients, dischargeQueue),
-    };
-    setMessages((prev) => [...prev, userMsg, aiMsg]);
+  const send = useCallback(async (text: string) => {
+    if (!text.trim() || thinking) return;
+    const userMsg: Message = { id: String(Date.now()), role: "user", text: text.trim() };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
-  }, [allPatients, dischargeQueue]);
+    setThinking(true);
+    try {
+      const response = await buildAdminResponse(text, allPatients, waitingPatients);
+      const aiMsg: Message = {
+        id: String(Date.now() + 1),
+        role: "ai",
+        text: response,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } finally {
+      setThinking(false);
+    }
+  }, [allPatients, waitingPatients, thinking]);
 
   return (
     <>
@@ -261,7 +284,8 @@ export function AdminAskPulse({ allPatients, dischargeQueue }: AdminAskPulseProp
                     <button
                       key={prompt}
                       type="button"
-                      onClick={() => send(prompt)}
+                      onClick={() => void send(prompt)}
+                      disabled={thinking}
                       style={{
                         textAlign: "left", background: "#F8F5FD",
                         border: "1px solid #EFE7F7", borderRadius: 8,
@@ -307,6 +331,13 @@ export function AdminAskPulse({ allPatients, dischargeQueue }: AdminAskPulseProp
                 </div>
               </div>
             ))}
+
+            {thinking && (
+              <div className="flex items-center" style={{ gap: 7, color: "#8A8394", fontSize: 12 }}>
+                <span className="ti ti-loader-2" style={{ fontSize: 14 }} aria-hidden="true" />
+                Pulling live summaries…
+              </div>
+            )}
           </div>
 
           {/* Input */}
@@ -323,11 +354,12 @@ export function AdminAskPulse({ allPatients, dischargeQueue }: AdminAskPulseProp
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  send(input);
+                  void send(input);
                 }
               }}
               placeholder="Ask about patients, beds, discharges…"
               rows={2}
+              disabled={thinking}
               style={{
                 flex: 1, border: "1.5px solid #E7E0E9", borderRadius: 10,
                 padding: "8px 12px", fontSize: 12, fontFamily: "inherit",
@@ -336,8 +368,8 @@ export function AdminAskPulse({ allPatients, dischargeQueue }: AdminAskPulseProp
             />
             <button
               type="button"
-              onClick={() => send(input)}
-              disabled={!input.trim()}
+              onClick={() => void send(input)}
+              disabled={!input.trim() || thinking}
               style={{
                 background: input.trim() ? "#7C5FAE" : "#EFEBEF",
                 border: "none", borderRadius: 10, width: 36, height: 36,

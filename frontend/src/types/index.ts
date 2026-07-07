@@ -168,6 +168,8 @@ export interface DischargeCondition {
 
 export interface Patient {
   id: string;
+  /** Hospital MRN-style identifier, e.g. P-1001 */
+  patientNumber: string;
   name: string;
   initials: string;
   age: number;

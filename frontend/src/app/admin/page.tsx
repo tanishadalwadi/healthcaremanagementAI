@@ -24,7 +24,7 @@ import {
   getAttentionFeed,
   getPatients,
   getAllPatients,
-  getDischargeQueue,
+  getWaitingPatients,
   type AdminKPIs,
 } from "@/lib/api";
 import { KpiCard }            from "@/components/dashboard/kpi-card";
@@ -33,7 +33,7 @@ import { AdminPatientTable }  from "@/components/admin/admin-patient-table";
 import { AdminCalendar }      from "@/components/admin/admin-calendar";
 import { CreatePatientModal } from "@/components/admin/create-patient-modal";
 import { AdminAskPulse }     from "@/components/admin/admin-ask-pulse";
-import type { Patient, PatientDetail } from "@/types";
+import type { Patient } from "@/types";
 
 // ─── localStorage key for "new since last viewed" discharge badge ─────────────
 const DISCHARGE_SEEN_KEY = "pulse_discharge_seen_count_morgan";
@@ -56,7 +56,7 @@ type KpiDef = {
   accent: string;
   tint: string;
   href: string;
-  getChartData: (kpis: AdminKPIs, dischargeQueue: PatientDetail[]) => ChartDatum[];
+  getChartData: (kpis: AdminKPIs, waitingPatients: Patient[]) => ChartDatum[];
 };
 
 const DEPT_ORDER = [
@@ -95,8 +95,8 @@ const KPI_DEFS: KpiDef[] = [
   {
     key: "dischargeQueueCount", label: "Discharge queue", icon: "ti-door-exit",
     accent: "#2D7A72", tint: "#E1F3F0", href: "/admin/discharge",
-    getChartData: (_kpis, dischargeQueue) => {
-      const byDept = dischargeQueue.reduce<Record<string, number>>((acc, p) => {
+    getChartData: (_kpis, waitingPatients) => {
+      const byDept = waitingPatients.reduce<Record<string, number>>((acc, p) => {
         acc[p.departmentId] = (acc[p.departmentId] ?? 0) + 1;
         return acc;
       }, {});
@@ -123,7 +123,7 @@ export default function AdminDashboardPage() {
   const [feed,           setFeed]           = useState<Awaited<ReturnType<typeof getAttentionFeed>>>([]);
   const [patients,       setPatients]       = useState<Patient[]>([]);
   const [allPatients,    setAllPatients]    = useState<Patient[]>([]);
-  const [dischargeQueue, setDischargeQueue] = useState<PatientDetail[]>([]);
+  const [waitingPatients, setWaitingPatients] = useState<Patient[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [showModal,      setShowModal]      = useState(false);
   const [refreshKey,     setRefreshKey]     = useState(0);
@@ -147,13 +147,13 @@ export default function AdminDashboardPage() {
       getAttentionFeed(),
       getPatients(),
       getAllPatients(),
-      getDischargeQueue(),
-    ]).then(([k, f, p, all, dq]) => {
+      getWaitingPatients(),
+    ]).then(([k, f, p, all, waiting]) => {
       setKpis(k);
       setFeed(f);
       setPatients(p);
       setAllPatients(all);
-      setDischargeQueue(dq);
+      setWaitingPatients(waiting);
       setLoading(false);
     });
   }, [refreshKey]);
@@ -225,7 +225,7 @@ export default function AdminDashboardPage() {
                 tint={def.tint}
                 href={def.href}
                 badge={def.key === "dischargeQueueCount" ? dischargeBadge : undefined}
-                chartData={def.getChartData(kpis, dischargeQueue)}
+                chartData={def.getChartData(kpis, waitingPatients)}
               />
             ))}
           </div>
@@ -250,7 +250,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── Ask Pulse ─────────────────────────────────────────────────────────── */}
-      <AdminAskPulse allPatients={allPatients} dischargeQueue={dischargeQueue} />
+      <AdminAskPulse allPatients={allPatients} waitingPatients={waitingPatients} />
 
       {/* ── Create patient modal ──────────────────────────────────────────────── */}
       {showModal && (

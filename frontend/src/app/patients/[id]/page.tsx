@@ -9,10 +9,15 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { notFound } from "next/navigation";
-import { getPatientById, getTasksForPatient } from "@/lib/api";
+import {
+  getPatientById,
+  getTasksForPatient,
+  getConsultationsForPatient,
+  type Consultation,
+} from "@/lib/api";
 import { PatientDetailView } from "@/components/patient/patient-detail-view";
 import type { PatientDetail, NursingTask } from "@/types";
 
@@ -21,16 +26,24 @@ export default function PatientDetailPage() {
   const [patient,      setPatient]      = useState<PatientDetail | null | undefined>(undefined);
   const [nursingTasks, setNursingTasks] = useState<NursingTask[]>([]);
 
-  useEffect(() => {
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+
+  const reloadPatient = useCallback(() => {
     if (!params.id) return;
-    Promise.all([
+    return Promise.all([
       getPatientById(params.id),
       getTasksForPatient(params.id),
-    ]).then(([p, tasks]) => {
+      getConsultationsForPatient(params.id),
+    ]).then(([p, tasks, consults]) => {
       setPatient(p ?? null);
       setNursingTasks(tasks);
+      setConsultations(consults);
     });
   }, [params.id]);
+
+  useEffect(() => {
+    reloadPatient();
+  }, [reloadPatient]);
 
   if (patient === undefined) {
     return (
@@ -52,5 +65,12 @@ export default function PatientDetailPage() {
     notFound();
   }
 
-  return <PatientDetailView patient={patient} nursingTasks={nursingTasks} />;
+  return (
+    <PatientDetailView
+      patient={patient}
+      nursingTasks={nursingTasks}
+      consultations={consultations}
+      onDataChange={reloadPatient}
+    />
+  );
 }

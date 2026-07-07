@@ -8,7 +8,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth, DEMO_ACCOUNTS } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { getPatientsForDoctor, getDischargedPatientsForDoctor } from "@/lib/api";
 import { MorningRoundsClient } from "@/components/doctor/morning-rounds-client";
 import type { Patient } from "@/types";
@@ -39,10 +39,9 @@ export default function DoctorPage() {
     );
   }
 
-  // Derive doctor display name and specialty from the demo account record
-  const account = DEMO_ACCOUNTS.find((a) => a.id === user!.id);
-  const doctorName    = account?.name    ?? user!.name;
-  const doctorSubtitle = account?.subtitle ?? "Attending";
+  // Use enriched backend name from auth — demo account id is no longer in session.
+  const doctorName = user!.name;
+  const doctorSubtitle = "Attending";
 
   return (
     <MorningRoundsClient
