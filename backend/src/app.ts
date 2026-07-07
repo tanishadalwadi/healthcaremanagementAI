@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { AppError } from "./errors/app-error.js";
 import { env } from "./config/env.js";
@@ -12,11 +13,14 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   });
 
+  await app.register(cors, {
+    origin: env.CORS_ORIGINS,
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+  });
+
   app.setNotFoundHandler((_request, reply) => {
-    return jsonResponse(reply, HttpStatus.NOT_FOUND, {
-      status: "error",
-      message: "Route not found",
-    });
+    return sendError(reply, HttpStatus.NOT_FOUND, "Route not found");
   });
 
   app.setErrorHandler((error, request, reply) => {

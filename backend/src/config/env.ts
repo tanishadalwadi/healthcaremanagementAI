@@ -20,11 +20,30 @@ function requireEnv(name: string): string {
   return value;
 }
 
+const DEFAULT_CORS_ORIGINS = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+] as const;
+
+function parseCorsOrigins(value: string | undefined): string[] {
+  if (!value?.trim()) {
+    return [...DEFAULT_CORS_ORIGINS];
+  }
+
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
 export const env = {
   NODE_ENV: process.env.NODE_ENV ?? "development",
   HOST: process.env.HOST ?? "0.0.0.0",
   PORT: parsePort(process.env.PORT, 4000),
   IS_PRODUCTION: (process.env.NODE_ENV ?? "development") === "production",
+  CORS_ORIGINS: parseCorsOrigins(process.env.CORS_ORIGINS),
   DATABASE_URL: requireEnv("DATABASE_URL"),
   DIRECT_URL: process.env.DIRECT_URL?.trim() || requireEnv("DATABASE_URL"),
 } as const;
