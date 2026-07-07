@@ -6,7 +6,10 @@ export interface PatientListQuery {
   search?: string;
   department?: string;
   status?: PatientStatus;
+  excludeStatus?: PatientStatus;
   priority?: Priority;
+  assignedNurseId?: string;
+  assignedDoctorId?: string;
 }
 
 export interface CreatePatientInput {
@@ -16,11 +19,13 @@ export interface CreatePatientInput {
   age: number;
   gender: Gender;
   room?: string | null;
+  diagnosis?: string | null;
   departmentId: string;
   status?: PatientStatus;
   priority?: Priority;
   assignedNurseId?: string | null;
   assignedDoctorId?: string | null;
+  dischargeRequestedAt?: Date | null;
 }
 
 export type UpdatePatientInput = Partial<CreatePatientInput>;
@@ -43,11 +48,13 @@ export interface PatientSummaryDto {
   age: number;
   gender: Gender;
   room: string | null;
+  diagnosis: string | null;
   status: PatientStatus;
   priority: Priority;
   departmentId: string;
   assignedNurseId: string | null;
   assignedDoctorId: string | null;
+  dischargeRequestedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

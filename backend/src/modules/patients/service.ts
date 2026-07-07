@@ -18,11 +18,13 @@ function toPatientSummaryDto(patient: PatientSummaryRecord): PatientSummaryDto {
     age: patient.age,
     gender: patient.gender,
     room: patient.room,
+    diagnosis: patient.diagnosis,
     status: patient.status,
     priority: patient.priority,
     departmentId: patient.departmentId,
     assignedNurseId: patient.assignedNurseId,
     assignedDoctorId: patient.assignedDoctorId,
+    dischargeRequestedAt: patient.dischargeRequestedAt,
     createdAt: patient.createdAt,
     updatedAt: patient.updatedAt,
   };
@@ -100,6 +102,29 @@ export class PatientService {
         totalPages,
       },
     };
+  }
+
+  async listPatientsByUser(
+    userId: string,
+    query: PatientListQuery,
+  ): Promise<PaginatedResult<PatientSummaryDto>> {
+    const user = await this.repository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundError(`User with id "${userId}" was not found`);
+    }
+
+    if (user.role === "NURSE") {
+      return this.listPatients({ ...query, assignedNurseId: userId });
+    }
+
+    if (user.role === "DOCTOR") {
+      return this.listPatients({ ...query, assignedDoctorId: userId });
+    }
+
+    throw new BadRequestError(
+      `Patients cannot be listed for user role "${user.role}"`,
+    );
   }
 
   async getPatientById(id: string): Promise<PatientDetailDto> {

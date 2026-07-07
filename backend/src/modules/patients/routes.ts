@@ -5,6 +5,7 @@ export async function registerPatientRoutes(
   app: FastifyInstance,
   controller: PatientController,
 ): Promise<void> {
+  app.get("/users/:id/patients", controller.listPatientsByUser);
   app.get("/patients", controller.listPatients);
   app.get("/patients/:id", controller.getPatientById);
   app.post("/patients", controller.createPatient);

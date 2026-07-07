@@ -29,3 +29,10 @@ export class ConflictError extends AppError {
     this.name = "ConflictError";
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message: string, error?: unknown) {
+    super(401, message, error);
+    this.name = "UnauthorizedError";
+  }
+}

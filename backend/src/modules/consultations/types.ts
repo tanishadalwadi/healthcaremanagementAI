@@ -73,6 +73,7 @@ export interface ConsultationSummaryDto {
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  doctor: UserSummaryDto;
 }
 
 export interface ConsultationDetailDto extends ConsultationSummaryDto {

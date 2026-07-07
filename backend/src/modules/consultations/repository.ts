@@ -19,6 +19,14 @@ const consultationSummarySelect = {
   completedAt: true,
   createdAt: true,
   updatedAt: true,
+  doctor: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+  },
 } satisfies Prisma.ConsultationSelect;
 
 const consultationDetailInclude = {

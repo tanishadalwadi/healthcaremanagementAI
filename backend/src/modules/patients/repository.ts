@@ -9,11 +9,13 @@ const patientSummarySelect = {
   age: true,
   gender: true,
   room: true,
+  diagnosis: true,
   status: true,
   priority: true,
   departmentId: true,
   assignedNurseId: true,
   assignedDoctorId: true,
+  dischargeRequestedAt: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.PatientSelect;
@@ -92,14 +94,30 @@ export class PatientRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async findMany(query: PatientListQuery) {
-    const { page, limit, search, department, status, priority } = query;
+    const {
+      page,
+      limit,
+      search,
+      department,
+      status,
+      excludeStatus,
+      priority,
+      assignedNurseId,
+      assignedDoctorId,
+    } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.PatientWhereInput = {
       deletedAt: null,
       ...(department ? { departmentId: department } : {}),
-      ...(status ? { status } : {}),
+      ...(status
+        ? { status }
+        : excludeStatus
+          ? { status: { not: excludeStatus } }
+          : {}),
       ...(priority ? { priority } : {}),
+      ...(assignedNurseId ? { assignedNurseId } : {}),
+      ...(assignedDoctorId ? { assignedDoctorId } : {}),
       ...(search
         ? {
             OR: [
@@ -148,6 +166,7 @@ export class PatientRepository {
         age: data.age,
         gender: data.gender,
         room: data.room ?? null,
+        diagnosis: data.diagnosis ?? null,
         departmentId: data.departmentId,
         status: data.status,
         priority: data.priority,
@@ -180,6 +199,7 @@ export class PatientRepository {
         ...(data.age !== undefined ? { age: data.age } : {}),
         ...(data.gender !== undefined ? { gender: data.gender } : {}),
         ...(data.room !== undefined ? { room: data.room } : {}),
+        ...(data.diagnosis !== undefined ? { diagnosis: data.diagnosis } : {}),
         ...(data.departmentId !== undefined ? { departmentId: data.departmentId } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.priority !== undefined ? { priority: data.priority } : {}),
@@ -188,6 +208,9 @@ export class PatientRepository {
           : {}),
         ...(data.assignedDoctorId !== undefined
           ? { assignedDoctorId: data.assignedDoctorId }
+          : {}),
+        ...(data.dischargeRequestedAt !== undefined
+          ? { dischargeRequestedAt: data.dischargeRequestedAt }
           : {}),
       },
       select: patientSummarySelect,
@@ -222,5 +245,12 @@ export class PatientRepository {
   ): Promise<boolean> {
     const count = await this.db.user.count({ where: { id, role } });
     return count > 0;
+  }
+
+  async findUserById(id: string) {
+    return this.db.user.findUnique({
+      where: { id },
+      select: { id: true, role: true },
+    });
   }
 }

@@ -92,6 +92,21 @@ enum ConsultationStatus {
   CANCELLED
 }
 
+enum BedStatus {
+  AVAILABLE
+  OCCUPIED
+}
+
+enum AmbulanceStatus {
+  AVAILABLE
+  DISPATCHED
+}
+
+enum DischargeConditionStatus {
+  COMPLETE
+  INCOMPLETE
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
@@ -100,6 +115,7 @@ model User {
   id           String    @id @default(uuid()) @db.Uuid
   name         String
   email        String    @unique
+  passwordHash String?   @map("password_hash")
   role         UserRole
   departmentId String?   @map("department_id") @db.Uuid
   active       Boolean   @default(true)
@@ -112,6 +128,8 @@ model User {
   consultationsAsDoctor  Consultation[] @relation("ConsultationDoctor")
   workflowEventsCreated  WorkflowEvent[] @relation("WorkflowEventCreator")
   tasks                    Task[]
+  vitalSignsRecorded       VitalSign[] @relation("VitalSignRecorder")
+  notifications            Notification[]
 
   @@index([role])
   @@index([departmentId])
@@ -130,6 +148,7 @@ model Department {
   patients Patient[]
   users    User[]
   consultations Consultation[]
+  beds     Bed[]
 
   @@index([status])
   @@index([deletedAt])
@@ -137,21 +156,23 @@ model Department {
 }
 
 model Patient {
-  id               String        @id @default(uuid()) @db.Uuid
-  patientNumber    String        @unique @map("patient_number")
-  firstName        String        @map("first_name")
-  lastName         String        @map("last_name")
-  age              Int
-  gender           Gender
-  room             String?
-  status           PatientStatus @default(ACTIVE)
-  priority         Priority      @default(MEDIUM)
-  departmentId     String        @map("department_id") @db.Uuid
-  assignedNurseId  String?       @map("assigned_nurse_id") @db.Uuid
-  assignedDoctorId String?       @map("assigned_doctor_id") @db.Uuid
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
-  deletedAt        DateTime?     @map("deleted_at")
+  id                   String        @id @default(uuid()) @db.Uuid
+  patientNumber        String        @unique @map("patient_number")
+  firstName            String        @map("first_name")
+  lastName             String        @map("last_name")
+  age                  Int
+  gender               Gender
+  room                 String?
+  diagnosis            String?
+  status               PatientStatus @default(ACTIVE)
+  priority             Priority      @default(MEDIUM)
+  departmentId         String        @map("department_id") @db.Uuid
+  assignedNurseId      String?       @map("assigned_nurse_id") @db.Uuid
+  assignedDoctorId     String?       @map("assigned_doctor_id") @db.Uuid
+  dischargeRequestedAt DateTime?     @map("discharge_requested_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  deletedAt            DateTime?     @map("deleted_at")
 
   department     Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   assignedNurse  User?          @relation("AssignedNurse", fields: [assignedNurseId], references: [id], onDelete: SetNull)
@@ -160,6 +181,10 @@ model Patient {
   events         PatientEvent[]
   tasks          Task[]
   consultations  Consultation[]
+  vitalSigns     VitalSign[]
+  notifications  Notification[]
+  dischargeConditions DischargeCondition[]
+  bed            Bed?
 
   @@index([departmentId])
   @@index([assignedNurseId])
@@ -257,4 +282,86 @@ model Consultation {
   @@index([status])
   @@index([scheduledAt])
   @@map("consultations")
+}
+
+model VitalSign {
+  id           String   @id @default(uuid()) @db.Uuid
+  patientId    String   @map("patient_id") @db.Uuid
+  recordedById String?  @map("recorded_by_id") @db.Uuid
+  bloodPressure String  @map("blood_pressure")
+  pulse        Int
+  temperature  Float
+  respRate     Int      @map("resp_rate")
+  o2Saturation Int      @map("o2_saturation")
+  recordedAt   DateTime @default(now()) @map("recorded_at")
+
+  patient    Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordedBy User?   @relation("VitalSignRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([recordedAt])
+  @@map("vital_signs")
+}
+
+model Bed {
+  id           String    @id @default(uuid()) @db.Uuid
+  roomLabel    String    @unique @map("room_label")
+  departmentId String    @map("department_id") @db.Uuid
+  status       BedStatus @default(AVAILABLE)
+  patientId    String?   @unique @map("patient_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  patient    Patient?   @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([departmentId])
+  @@index([status])
+  @@map("beds")
+}
+
+model Ambulance {
+  id        String           @id @default(uuid()) @db.Uuid
+  unitLabel String           @unique @map("unit_label")
+  status    AmbulanceStatus  @default(AVAILABLE)
+  label     String
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("ambulances")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  patientId String   @map("patient_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  summary   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model DischargeCondition {
+  id                String                   @id @default(uuid()) @db.Uuid
+  patientId         String                   @map("patient_id") @db.Uuid
+  condition         String
+  status            DischargeConditionStatus @default(INCOMPLETE)
+  owningDepartment  String                   @map("owning_department")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, condition])
+  @@index([patientId])
+  @@index([status])
+  @@map("discharge_conditions")
 }

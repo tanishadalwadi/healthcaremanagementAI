@@ -9,6 +9,7 @@ import {
   listPatientsQuerySchema,
   patientIdParamSchema,
   updatePatientBodySchema,
+  userIdParamSchema,
 } from "./validator.js";
 
 export class PatientController {
@@ -23,6 +24,23 @@ export class PatientController {
         reply,
         HttpStatus.OK,
         "Patients retrieved successfully",
+        data,
+      );
+    } catch (error) {
+      return this.handleError(reply, error);
+    }
+  };
+
+  listPatientsByUser = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = userIdParamSchema.parse(request.params);
+      const query = listPatientsQuerySchema.parse(request.query);
+      const data = await this.service.listPatientsByUser(id, query);
+
+      return sendSuccess(
+        reply,
+        HttpStatus.OK,
+        "User patients retrieved successfully",
         data,
       );
     } catch (error) {

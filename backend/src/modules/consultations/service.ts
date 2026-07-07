@@ -30,6 +30,12 @@ function toConsultationSummaryDto(
     completedAt: consultation.completedAt,
     createdAt: consultation.createdAt,
     updatedAt: consultation.updatedAt,
+    doctor: {
+      id: consultation.doctor.id,
+      name: consultation.doctor.name,
+      email: consultation.doctor.email,
+      role: consultation.doctor.role,
+    },
   };
 }
 

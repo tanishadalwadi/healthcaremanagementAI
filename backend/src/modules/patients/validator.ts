@@ -5,13 +5,20 @@ export const patientIdParamSchema = z.object({
   id: z.string().uuid("Invalid patient id"),
 });
 
+export const userIdParamSchema = z.object({
+  id: z.string().uuid("Invalid user id"),
+});
+
 export const listPatientsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   search: z.string().trim().min(1).optional(),
   department: z.string().uuid("Invalid department id").optional(),
   status: z.nativeEnum(PatientStatus).optional(),
+  excludeStatus: z.nativeEnum(PatientStatus).optional(),
   priority: z.nativeEnum(Priority).optional(),
+  assignedNurseId: z.string().uuid("Invalid nurse id").optional(),
+  assignedDoctorId: z.string().uuid("Invalid doctor id").optional(),
 });
 
 export const createPatientBodySchema = z.object({
@@ -43,11 +50,19 @@ export const createPatientBodySchema = z.object({
     .max(50, "Room must be at most 50 characters")
     .optional()
     .nullable(),
+  diagnosis: z
+    .string()
+    .trim()
+    .min(1, "Diagnosis cannot be empty")
+    .max(255, "Diagnosis must be at most 255 characters")
+    .optional()
+    .nullable(),
   departmentId: z.string().uuid("Invalid department id"),
   status: z.nativeEnum(PatientStatus).optional(),
   priority: z.nativeEnum(Priority).optional(),
   assignedNurseId: z.string().uuid("Invalid nurse id").optional().nullable(),
   assignedDoctorId: z.string().uuid("Invalid doctor id").optional().nullable(),
+  dischargeRequestedAt: z.coerce.date().optional().nullable(),
 });
 
 export const updatePatientBodySchema = createPatientBodySchema.partial();

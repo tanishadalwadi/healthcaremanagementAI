@@ -46,6 +46,9 @@ export const env = {
   CORS_ORIGINS: parseCorsOrigins(process.env.CORS_ORIGINS),
   DATABASE_URL: requireEnv("DATABASE_URL"),
   DIRECT_URL: process.env.DIRECT_URL?.trim() || requireEnv("DATABASE_URL"),
+  JWT_SECRET:
+    process.env.JWT_SECRET?.trim() ||
+    "pulse-dev-jwt-secret-change-in-production",
 } as const;
 
 export type Env = typeof env;
